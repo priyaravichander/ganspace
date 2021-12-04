@@ -678,6 +678,8 @@ def get_model(name, output_class, device, **kwargs):
         model = StyleGAN(device, class_name=output_class)
     elif name == 'StyleGAN2':
         model = StyleGAN2(device, class_name=output_class)
+    elif name == 'CycleGAN':
+        model = CycleGAN(device, class_name=output_class)
     else:
         raise RuntimeError(f'Unknown model {name}')
 
