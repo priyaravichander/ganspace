@@ -105,7 +105,7 @@ def make_grid(latent, lat_mean, lat_comp, lat_stdev, act_mean, act_comp, act_std
             coord = ((r * n_blocks) % n_rows) + ((r * n_blocks) // n_rows)
             plt.subplot(n_rows//n_blocks, n_blocks, 1 + coord)
 
-            if model == 'CGAN' or (model == None):
+            if model == 'CGAN' or (len(imgs) == 1):
               imgs = np.vsplit(imgs[0], n_cols)
               for i, im in enumerate(imgs):
                 imgs[i] = im.reshape(im.shape[1], im.shape[1])
