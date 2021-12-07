@@ -121,7 +121,6 @@ def make_grid(latent, lat_mean, lat_comp, lat_stdev, act_mean, act_comp, act_std
               plt.ylabel(f'C{r}')
               
             else:
-              print(model)
               plt.imshow(np.hstack(imgs))
               # Custom x-axis labels
               W = imgs[0].shape[1] # image width
