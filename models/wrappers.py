@@ -21,6 +21,7 @@ from netdissect import proggan, zdataset
 from . import biggan
 from . import stylegan
 from . import stylegan2
+from . import cgan
 from abc import abstractmethod, ABC as AbstractBaseClass
 from functools import singledispatch
 
@@ -75,6 +76,7 @@ class BaseModel(AbstractBaseClass, torch.nn.Module):
         if z is None:
             z = self.sample_latent(n_samples, seed=seed)
         elif isinstance(z, list):
+            # z = z[0]
             z = [torch.tensor(l).to(self.device) if not torch.is_tensor(l) else l for l in z]
         elif not torch.is_tensor(z):
             z = torch.tensor(z).to(self.device)
@@ -466,6 +468,52 @@ class GANZooModel(BaseModel):
         return 0.5*(out+1)
 
 
+class CGAN(BaseModel):
+    def __init__(self, device, output_class):
+        super(CGAN, self).__init__('CGAN', output_class)
+        self.device = device
+
+        valid_classes = ['0','1','2','3','4','5','6','7','8']
+        assert self.outclass in valid_classes, 'Invalid condition. Class should be a digit 0-9'
+
+        self.load_model()
+        self.name = f'CGAN-{self.outclass}'
+        self.has_latent_residual = False
+
+    def load_model(self):
+        self.model = cgan.Generator()
+        self.model.load_state_dict(torch.load('/content/ganspace/models/cgan/cgan_G.pt'))
+
+    def sample_latent(self, n_samples=1, seed=None, truncation=None):
+        z = torch.randn(n_samples, 100).to(self.device)
+        return z
+    
+    # override parent class method
+    def sample_np(self, z=None, n_samples=1, seed=None):
+        if z is None:
+            z = self.sample_latent(n_samples, seed=seed)
+        elif isinstance(z, list):
+            z = z[0]
+            # z = [torch.tensor(l).to(self.device) if not torch.is_tensor(l) else l for l in z]
+        elif not torch.is_tensor(z):
+            z = torch.tensor(z).to(self.device)
+        img = self.forward(z)
+        img_np = img.permute(0, 2, 3, 1).cpu().detach().numpy()
+        return np.clip(img_np, 0.0, 1.0).squeeze()
+
+    def forward(self, x):
+        if isinstance(x, list):
+          label = torch.LongTensor([int(self.outclass) for i in range(len(x))]).to(self.device)
+        else:
+          label = torch.LongTensor([int(self.outclass) for i in range(x.size()[0])]).to(self.device)
+        out = self.model.forward(x, label).unsqueeze(1)
+        return 0.5*(out+1)
+
+    def partial_forward(self, x, layer_name):
+        return self.forward(x)
+        
+
+
 class ProGAN(BaseModel):
     def __init__(self, device, lsun_class=None):
         super(ProGAN, self).__init__('ProGAN', lsun_class)
@@ -678,6 +726,8 @@ def get_model(name, output_class, device, **kwargs):
         model = StyleGAN(device, class_name=output_class)
     elif name == 'StyleGAN2':
         model = StyleGAN2(device, class_name=output_class)
+    elif name == 'CGAN':
+        model = CGAN(device, output_class)
     else:
         raise RuntimeError(f'Unknown model {name}')
 
