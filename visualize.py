@@ -76,7 +76,7 @@ def make_mp4(imgs, duration_secs, outname):
             raise sp.CalledProcessError(p.returncode, command)
 
 
-def make_grid(latent, lat_mean, lat_comp, lat_stdev, act_mean, act_comp, act_stdev, scale=1, n_rows=10, n_cols=5, make_plots=True, edit_type='latent', model='CGAN'):
+def make_grid(latent, lat_mean, lat_comp, lat_stdev, act_mean, act_comp, act_stdev, scale=1, n_rows=10, n_cols=5, make_plots=True, edit_type='latent', model=None):
     from notebooks.notebook_utils import create_strip_centered
 
     inst.remove_edits()
@@ -105,12 +105,12 @@ def make_grid(latent, lat_mean, lat_comp, lat_stdev, act_mean, act_comp, act_std
             coord = ((r * n_blocks) % n_rows) + ((r * n_blocks) // n_rows)
             plt.subplot(n_rows//n_blocks, n_blocks, 1 + coord)
 
-            if model == 'CGAN':
+            if model == 'CGAN' or (model == None):
               imgs = np.vsplit(imgs[0], n_cols)
               for i, im in enumerate(imgs):
                 imgs[i] = im.reshape(im.shape[1], im.shape[1])
 
-              plt.imshow(np.hstack(imgs))
+              plt.imshow(np.hstack(imgs), cmap='gray')
             
               # Custom x-axis labels
               W = imgs[0].shape[1] # image width
@@ -121,6 +121,7 @@ def make_grid(latent, lat_mean, lat_comp, lat_stdev, act_mean, act_comp, act_std
               plt.ylabel(f'C{r}')
               
             else:
+              print(model)
               plt.imshow(np.hstack(imgs))
               # Custom x-axis labels
               W = imgs[0].shape[1] # image width
@@ -260,7 +261,7 @@ if __name__ == '__main__':
         plt.figure(figsize = (14,12))
         plt.suptitle(f"{args.estimator.upper()}: {model.name} - {layer_name}, {get_edit_name(edit_mode)} edit", size=16)
         make_grid(tensors.Z_global_mean, tensors.Z_global_mean, tensors.Z_comp, tensors.Z_stdev, tensors.X_global_mean,
-            tensors.X_comp, tensors.X_stdev, scale=args.sigma, edit_type=edit_mode, n_rows=14, model=model.name.split('-')[0])
+            tensors.X_comp, tensors.X_stdev, scale=args.sigma, edit_type=edit_mode, n_rows=14, model=args.model)
         plt.savefig(outdir_summ / f'components_{get_edit_name(edit_mode)}.jpg', dpi=300)
         show()
 
