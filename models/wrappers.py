@@ -24,6 +24,7 @@ from . import stylegan2
 from . import cgan
 from abc import abstractmethod, ABC as AbstractBaseClass
 from functools import singledispatch
+from . import DCGAN as dcgan
 
 class BaseModel(AbstractBaseClass, torch.nn.Module):
 
@@ -94,6 +95,72 @@ class BaseModel(AbstractBaseClass, torch.nn.Module):
 
     def named_modules(self, *args, **kwargs):
         return self.model.named_modules(*args, **kwargs)
+
+#CS747 - Including DCGAN model
+class DCGAN(BaseModel):
+    def __init__(self, device, lsun_class=None):
+        super(DCGAN, self).__init__('DCGAN', lsun_class)
+        self.device = device
+        print('this is DCGAN')
+        # These are downloaded by GANDissect
+        # valid_classes = [ 'bedroom', 'churchoutdoor', 'conferenceroom',
+        # 'diningroom', 'kitchen', 'livingroom', 'restaurant' ]
+        # assert self.outclass in valid_classes, \
+        #     f'Invalid LSUN class {self.outclass}, should be one of {
+        #     valid_classes}'
+
+        self.load_model()
+        self.name = f'DCGAN-plants'
+        self.has_latent_residual = False
+
+    def load_model(self):
+        checkpoint_root = os.environ.get('GANCONTROL_CHECKPOINT_DIR',
+                                         Path(__file__).parent / 'checkpoints')
+        checkpoint = Path(checkpoint_root) / f'dcgan_plants.pth'
+        if not checkpoint.is_file():
+            print('wrong place')
+            os.makedirs(checkpoint.parent, exist_ok=True)
+            url = f'http://netdissect.csail.mit.edu/data/ganmodel/karras/' \
+                  f'{self.outclass}_lsun.pth'
+            download_ckpt(url, checkpoint)
+
+        self.model = dcgan.from_pth_file(str(checkpoint.resolve())).to(
+            self.device)
+
+    def sample_latent(self, n_samples=1, seed=None, truncation=None):
+        if seed is None:
+            seed = np.random.randint(
+                np.iinfo(np.int32).max)  # use (reproducible) global rand state
+        noise = zdataset.z_sample_for_model(self.model, n_samples, seed=seed)[
+            ...]
+        return noise.to(self.device)
+
+    def forward(self, x):
+        if isinstance(x, list):
+            assert len(x) == 1, "ProGAN only supports a single global latent"
+            x = x[0]
+
+        out = self.model.forward(x)
+        return 0.5 * (out + 1)
+
+    # Run model only until given layer
+    def partial_forward(self, x, layer_name):
+        # assert isinstance(self.model, torch.nn.Sequential), 'Expected
+        # sequential model'
+
+        if isinstance(x, list):
+            assert len(x) == 1, "ProGAN only supports a single global latent"
+            x = x[0]
+
+        x = x.view(x.shape[0], x.shape[1], 1, 1)
+        for name, module in self.model._modules.items():  # ordered dict
+            x = module(x)
+            if name == layer_name:
+                return
+
+        raise RuntimeError(
+            f'Layer {layer_name} not encountered in partial_forward')
+
 
 # PyTorch port of StyleGAN 2
 class StyleGAN2(BaseModel):
@@ -728,6 +795,8 @@ def get_model(name, output_class, device, **kwargs):
         model = StyleGAN2(device, class_name=output_class)
     elif name == 'CGAN':
         model = CGAN(device, output_class)
+    elif name == 'DCGAN_Ours':
+        model = DCGAN(device, 'DCGAN')
     else:
         raise RuntimeError(f'Unknown model {name}')
 
